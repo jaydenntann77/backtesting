@@ -1,4 +1,8 @@
 Backtesting strategy in Python using backtesting.py package
 
+Full strategy: 21ema.py
+
 Indicators:
-- MAs, RSI, ADX
+- MAs and ADX
+
+

@@ -6,7 +6,7 @@ from backtesting import Strategy, Backtest
 from backtesting.lib import crossover
 
 
-# --- Function to Identify Swing Highs and Lows ---
+# identify swing highs and lows
 def find_swing_highs_lows(data, lookback=10):
     """Identifies swing highs and lows in the price data."""
     highs, _ = find_peaks(data['High'], distance=lookback)  # Detect swing highs
@@ -14,15 +14,15 @@ def find_swing_highs_lows(data, lookback=10):
     return highs, lows
 
 
-# --- Function to Calculate EMA ---
+# calculate ema
 def EMA(series, period):
     """Exponential Moving Average (EMA) Calculation"""
     return pd.Series(series).ewm(span=period, adjust=False).mean()
 
 
-# --- Function to Calculate ADX (Trend Strength Filter) ---
+# calculate adx
 def ADX(data, period=14):
-    """Calculates ADX to determine if the market is trending."""
+    """calculates ADX to determine if the market is trending"""
     df = data.copy()
     df['TR'] = np.maximum(df['High'] - df['Low'], 
                           np.maximum(abs(df['High'] - df['Close'].shift(1)), abs(df['Low'] - df['Close'].shift(1))))
@@ -44,44 +44,42 @@ def ADX(data, period=14):
     return df['ADX']
 
 
-# --- Function to Calculate Position Size ---
+# position size calculator
 def calculate_position_size(balance, entry, stop_loss, risk_percent):
-    """Calculates position size ensuring EXACTLY 1% risk per trade."""
+    """ensures exactly 1% risk per trade"""
     
-    risk_amount = balance * (risk_percent / 100)  # 1% risk per trade
-    risk_distance = abs(entry - stop_loss)  # Distance between entry and SL
-    position_size = risk_amount / risk_distance  # Units based on risk
+    risk_amount = balance * (risk_percent / 100)  # 1% risk 
+    risk_distance = abs(entry - stop_loss)  # distance between entry and SL
+    position_size = risk_amount / risk_distance  # units based on risk
 
-    # Ensure size is valid: Whole number if >=1, fraction of equity if <1
+    # ensures size is valid: Whole number if >=1, fraction of equity if <1
     if position_size >= 1:
-        return round(position_size)  # Round to whole number
+        return round(position_size)  
     else:
-        return position_size / balance  # Return fraction of equity
+        return position_size / balance  
 
 
 
-
-# --- Trading Strategy ---
 class EURUSD_TradingStrategy(Strategy):
     ema_period = 21
-    adx_period = 14  # ADX Period to filter trends
-    adx_threshold = 25  # Only trade if ADX > 25
-    lookback_swing = 10  # Swing point detection
-    risk_percent = 1  # Risk 1% per trade
+    adx_period = 14  # ADX period to filter trends
+    adx_threshold = 25  # only enter if ADX > 25
+    lookback_swing = 10  # swing point detection
+    risk_percent = 1  
 
 
     def init(self):
-        """Initialize the 21 EMA & ADX Indicator"""
+        """Initialize the 21 EMA & ADX indicators"""
         self.ema21 = self.I(EMA, self.data.Close, self.ema_period)  # 21 EMA
         self.adx = self.I(ADX, self.data.df, self.adx_period)  # ADX for trend strength
 
     def next(self):
-        """Executes trading logic on each new bar."""
+        """executes trading logic on each new candlestick"""
         price = self.data.Close[-1]
         ema_value = self.ema21[-1]
         adx_value = self.adx[-1]
 
-        # Find swing highs and lows
+        # find swing highs and lows
         highs, lows = find_swing_highs_lows(self.data.df, lookback=self.lookback_swing)
 
         if len(highs) < 1 or len(lows) < 1:
@@ -90,9 +88,9 @@ class EURUSD_TradingStrategy(Strategy):
         swing_high = self.data.High[highs[-1]]
         swing_low = self.data.Low[lows[-1]]
 
-        # Stop Loss (2 pips below/above 21 EMA)
-        sl_long = ema_value - 0.01
-        sl_short = ema_value + 0.01
+        # Stop Loss (20 pips below/above 21 EMA)
+        sl_long = ema_value - 0.002
+        sl_short = ema_value + 0.002
 
         # Position Sizing
         position_size_long = calculate_position_size(self.equity, price, sl_long, self.risk_percent)
@@ -100,9 +98,9 @@ class EURUSD_TradingStrategy(Strategy):
 
         # --- Trend Filtering: Only Trade When ADX > Threshold ---
         if adx_value < self.adx_threshold:
-            return  # Skip trading in low-trend environments
+            return  # skips trading in low-trend environments
 
-        # --- Long Trade Entry ---
+        # --- Long Entry ---
         if not self.position and price > swing_high and ema_value > self.ema21[-2]:  # EMA Sloping Up
             print(f"BUY Signal | Price: {price:.4f}, Size: {position_size_long}")
             self.buy(size=position_size_long, sl=sl_long)
@@ -110,7 +108,7 @@ class EURUSD_TradingStrategy(Strategy):
             print(f"Equity = {self.equity:.2f}") 
             print("---------------------------")
 
-        # --- Short Trade Entry ---
+        # --- Short Entry ---
         elif not self.position and price < swing_low and ema_value < self.ema21[-2]:  # EMA Sloping Down
             print(f"SELL Signal | Price: {price:.4f}, Size: {position_size_short}")
             self.sell(size=position_size_short, sl=sl_short)
@@ -138,7 +136,7 @@ class EURUSD_TradingStrategy(Strategy):
 
 
 
-# --- Fetch 5m Data for EURUSD ---
+# --- fetch 5m Data for EURUSD ---
 
 EURUSD = yf.download("EURUSD=X", interval="5m", start="2025-03-01", end="2025-03-09")
 
